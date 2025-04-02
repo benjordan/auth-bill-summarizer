@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Spatie\PdfToText\Pdf;
+use OpenAI\Laravel\Facades\OpenAI;
 
 class BillController extends Controller
 {
@@ -50,9 +51,9 @@ class BillController extends Controller
             }
 
             $billDetails = $billDetailsResponse->json()['bill'];
-            $billText = $billDetails['title'] . "\n\n" . $billDetails['summary'];
+            $billText = $billData['title'] . "\n\n" . ($billData['summary'] ?? '[No summary provided]');
 
-            $billSummary = app('openai')->chat()->create([
+            $billSummary = OpenAI::chat()->create([
                 'model' => 'gpt-4',
                 'messages' => [
                     ['role' => 'system', 'content' => 'Summarize this California bill in clear, concise language for a government finance team.'],
@@ -66,7 +67,7 @@ class BillController extends Controller
 
             if (file_exists($pdfPath)) {
                 $pdfText = Pdf::getText($pdfPath);
-                $analysisSummary = app('openai')->chat()->create([
+                $analysisSummary = OpenAI::chat()->create([
                     'model' => 'gpt-4',
                     'messages' => [
                         ['role' => 'system', 'content' => 'Summarize this financial analysis document for an internal government audience.'],

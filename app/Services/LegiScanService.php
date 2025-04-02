@@ -48,7 +48,7 @@ class LegiScanService
             'key' => $this->apiKey,
             'op' => 'getMasterList',
             'session_id' => $sessionId,
-            'state' => $this->state,
+            'state'  => $this->state,
         ]);
 
         if (!$response->ok()) {
@@ -69,9 +69,14 @@ class LegiScanService
         $normalizedInput = strtoupper(preg_replace('/\s+/', '', $billNumber));
         logger()->info('Normalized input', ['input' => $normalizedInput]);
 
-        return collect($bills)->first(function ($bill) use ($normalizedInput) {
-            $billNum = strtoupper(preg_replace('/\s+/', '', $bill['number']));
-            return $billNum === $normalizedInput;
+        return collect($bills)->first(function ($bill) use ($billNumber) {
+            $input = strtoupper(preg_replace('/\s+/', '', $billNumber));
+            $target = strtoupper(preg_replace('/\s+/', '', $bill['number']));
+
+            return $input === $target;
         });
+
+        logger()->info('Normalized input', ['input' => $input]);
+        logger()->info('Available bills', collect($bills)->pluck('number')->take(10)->toArray());
     }
 }
