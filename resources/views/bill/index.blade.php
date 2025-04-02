@@ -1,6 +1,14 @@
 <x-layout>
     <div class="max-w-xl mx-auto mt-12 space-y-4">
         <h1 class="text-2xl font-bold">Bill Summarizer</h1>
+        <div class="prose">
+    <h1>Hello</h1>
+    <p>This is a test paragraph.</p>
+    <ul>
+        <li>First</li>
+        <li>Second</li>
+    </ul>
+</div>
         <form method="POST" action="{{ route('bill.analyze') }}" class="space-y-4">
             @csrf
             <div x-data="billSearch()" class="relative">

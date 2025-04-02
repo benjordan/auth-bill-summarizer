@@ -1,13 +1,18 @@
+import defaultTheme from 'tailwindcss/defaultTheme';
+import typography from '@tailwindcss/typography';
+
 export default {
+  content: [
+    './resources/**/*.blade.php',
+    './resources/**/*.js',
+    './resources/**/*.vue',
+  ],
   theme: {
     extend: {
-      colors: {
-        'primary': '#ff49db',
-      },
       fontFamily: {
-        'sans': ['Helvetica', 'Arial', 'sans-serif'],
+        sans: ['Inter', ...defaultTheme.fontFamily.sans],
       },
     },
   },
-  plugins: [require('@tailwindcss/typography')],
-}
+  plugins: [typography],
+};
