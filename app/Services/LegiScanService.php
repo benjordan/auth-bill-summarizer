@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use OpenAI\Laravel\Facades\OpenAI;
 
 class LegiScanService
 {
@@ -80,8 +81,8 @@ class LegiScanService
         $response = Http::get("https://api.legiscan.com/", [
             'key' => $this->apiKey,
             'op' => 'getMasterList',
-            'id' => $sessionId,
-            'state'  => $this->state,
+            'id'  => $sessionId, // not 'session_id' because... why be consistent?
+            'state' => $this->state,
         ]);
 
         if (!$response->ok()) {
@@ -107,5 +108,94 @@ class LegiScanService
             'number' => $bill['number'],
             'title' => $bill['title'],
         ])->take(10)->values()->all();
+    }
+
+    public function getBillDetails($billId)
+    {
+        $cacheKey = "legiscan_bill_{$billId}";
+
+        return Cache::remember($cacheKey, now()->addHours(6), function () use ($billId) {
+            $response = Http::get("https://api.legiscan.com/", [
+                'key' => $this->apiKey,
+                'op' => 'getBill',
+                'id' => $billId,
+            ]);
+
+            if (!$response->ok()) {
+                logger()->error('getBill failed', ['status' => $response->status()]);
+                return null;
+            }
+
+            $data = $response->json();
+            $bill = $data['bill'] ?? null;
+
+            if (!$bill || !is_array($bill)) {
+                logger()->warning('Bill details missing or malformed', ['bill_id' => $billId]);
+                return null;
+            }
+
+            return $bill;
+        });
+    }
+
+    public function getBillSummary(string $billId, string $title, ?string $summary): string
+    {
+        $cacheKey = "bill_summary_{$billId}";
+
+        return Cache::remember($cacheKey, now()->addHours(6), function () use ($title, $summary) {
+            $billText = $title . "\n\n" . ($summary ?? '[No summary provided]');
+
+            $response = OpenAI::chat()->create([
+                'model' => 'gpt-4o',
+                'messages' => [
+                    ['role' => 'system', 'content' => 'Write a one-paragraph summary of this California bill.
+                        Your summary must:
+                            •	Begin with “This bill…”
+                            •	Clearly and factually describe what the bill requires, authorizes, or prohibits
+                            •	Identify any state or local agencies, programs, or stakeholder groups responsible for implementation
+                            •	Include any deadlines, operative dates, or reporting requirements
+                            •	Mention if the bill contains an urgency clause or effective date
+                        Do not include:
+                            •	Fiscal analysis or cost estimates
+                            •	Opinions, justifications, or policy commentary
+                            •	References to Legislative Counsel digests
+                        Stick to a neutral, objective tone. The goal is to summarize only the substantive actions or directives in the bill.
+                        Also, Analyze the bill and extract the key components in bullet format to support drafting a formal bill summary.
+                        Organize the information under the following labeled sections:
+                            •	What the Bill Does:
+                        Bullet out the major requirements, authorizations, prohibitions, or procedural changes introduced by the bill. Focus on what the bill does, not why it does it.
+                            •	Stakeholders / Implementing Agencies:
+                        List any agencies, departments, boards, commissions, or stakeholder groups responsible for or affected by the bill.
+                            •	Key Dates and Deadlines:
+                        Note any operative dates, implementation deadlines, report due dates, or annual election/notice periods.
+                            •	Procedural Notes (if applicable):
+                        Call out anything the analyst should watch for—such as references to existing law, interplay with other bills, or conditions for activation (e.g., election by a manufacturer or opt-in clauses).
+                            •	Urgency Clause / Effective Date:
+                        If the bill includes language that makes it take effect immediately, or specifies an exact effective date, record it here.
+                        :warning: Do not include fiscal impacts, policy analysis, or Legislative Counsel digest references.
+                        '],
+                    ['role' => 'user', 'content' => $billText],
+                ],
+            ]);
+
+            return $response['choices'][0]['message']['content'] ?? '[Failed to summarize]';
+        });
+    }
+
+    public function getAnalysisSummary(string $billNumber, string $pdfText): ?string
+    {
+        $cacheKey = "analysis_summary_{$billNumber}";
+
+        return Cache::remember($cacheKey, now()->addHours(6), function () use ($pdfText) {
+            $response = OpenAI::chat()->create([
+                'model' => 'gpt-4o',
+                'messages' => [
+                    ['role' => 'system', 'content' => 'Summarize this financial analysis document for an internal government audience.'],
+                    ['role' => 'user', 'content' => $pdfText],
+                ],
+            ]);
+
+            return $response['choices'][0]['message']['content'] ?? null;
+        });
     }
 }

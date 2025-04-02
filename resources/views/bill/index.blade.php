@@ -35,7 +35,7 @@
 
                             <template x-if="bill.has_analysis">
                                 <span title="You've already analyzed this one" class="ml-2 text-green-500">
-                                    ✅
+                                    📜
                                 </span>
                             </template>
                         </li>
@@ -84,9 +84,13 @@
                         });
                 },
                 select(bill) {
-                    this.query = bill.number;
                     this.results = [];
+                    this.query = bill.number;
                     this.highlighted = -1;
+
+                    setTimeout(() => {
+                        window.location.href = `/bill/${bill.bill_id}`;
+                    }, 100);
                 },
                 highlightNext() {
                     if (this.highlighted < this.results.length - 1) this.highlighted++;

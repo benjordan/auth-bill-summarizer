@@ -17,6 +17,34 @@ class BillController extends Controller
         return view('bill.index', compact('sessions'));
     }
 
+    public function show($billId, LegiScanService $legiscan)
+    {
+        $billDetails = $legiscan->getBillDetails($billId);
+        //dd($billDetails);
+
+        if (!$billDetails) {
+            abort(404, 'Bill not found');
+        }
+
+        $billSummary = $legiscan->getBillSummary($billId, $billDetails['title'], $billDetails['summary'] ?? null);
+
+        // Check for a matching analysis file
+        $billNumber = strtoupper(preg_replace('/\s+/', '', $billDetails['bill_number']));
+        $pdfPath = storage_path("app/analyses/{$billNumber}.pdf");
+        $analysisSummary = null;
+
+        if (file_exists($pdfPath)) {
+            $pdfText = Pdf::getText($pdfPath);
+            $analysisSummary = $legiscan->getAnalysisSummary($billNumber, $pdfText);
+        }
+
+        return view('bill.show', [
+            'bill' => $billDetails,
+            'bill_summary' => $billSummary,
+            'analysis_summary' => $analysisSummary
+        ]);
+    }
+
     public function analyze(Request $request, LegiScanService $legiscan)
     {
         $validated = $request->validate([
@@ -80,6 +108,7 @@ class BillController extends Controller
                 'bill_summary' => $billSummary,
                 'analysis_summary' => $analysisSummary,
                 'link' => $billDetails['url'],
+                'bill' => $billDetails,
             ];
         });
 
