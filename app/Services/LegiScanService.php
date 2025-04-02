@@ -62,21 +62,49 @@ class LegiScanService
         $bills = $data['masterlist'] ?? [];
         unset($bills['session']);
 
-        // Dump bill numbers for sanity check
-        $billNumbers = collect($bills)->pluck('number')->map(fn($n) => str_replace(' ', '', strtoupper($n)));
-        logger()->info('Available bills', $billNumbers->take(10)->toArray());
-
-        $normalizedInput = strtoupper(preg_replace('/\s+/', '', $billNumber));
-        logger()->info('Normalized input', ['input' => $normalizedInput]);
-
         return collect($bills)->first(function ($bill) use ($billNumber) {
             $input = strtoupper(preg_replace('/\s+/', '', $billNumber));
             $target = strtoupper(preg_replace('/\s+/', '', $bill['number']));
 
             return $input === $target;
         });
+    }
 
-        logger()->info('Normalized input', ['input' => $input]);
-        logger()->info('Available bills', collect($bills)->pluck('number')->take(10)->toArray());
+    public function searchBillsFromSession($query, $sessionId)
+    {
+        $response = Http::get("https://api.legiscan.com/", [
+            'key' => $this->apiKey,
+            'op' => 'getMasterList',
+            'session_id' => $sessionId,
+            'state' => $this->state,
+        ]);
+
+        if (!$response->ok()) {
+            logger()->error('MasterList failed in searchBillsFromSession', ['status' => $response->status()]);
+            return [];
+        }
+
+        $data = $response->json();
+        $bills = $data['masterlist'] ?? [];
+        unset($bills['session']);
+
+        $queryUpper = strtoupper(preg_replace('/\s+/', '', $query));
+
+        return collect($bills)->filter(function ($bill) use ($queryUpper) {
+            if (!isset($bill['number'], $bill['bill_id'], $bill['title'])) {
+                return false;
+            }
+
+            $billNumber = strtoupper(preg_replace('/\s+/', '', $bill['number']));
+
+            return str_starts_with($billNumber, $queryUpper);
+        })
+            ->map(fn($bill) => [
+                'bill_id' => $bill['bill_id'],
+                'number' => $bill['number'],
+                'title' => $bill['title'],
+            ])
+            ->take(10)
+            ->values();
     }
 }

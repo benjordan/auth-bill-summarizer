@@ -54,7 +54,7 @@ class BillController extends Controller
             $billText = $billData['title'] . "\n\n" . ($billData['summary'] ?? '[No summary provided]');
 
             $billSummary = OpenAI::chat()->create([
-                'model' => 'gpt-4',
+                'model' => 'gpt-4o',
                 'messages' => [
                     ['role' => 'system', 'content' => 'Summarize this California bill in clear, concise language for a government finance team.'],
                     ['role' => 'user', 'content' => $billText],
@@ -68,7 +68,7 @@ class BillController extends Controller
             if (file_exists($pdfPath)) {
                 $pdfText = Pdf::getText($pdfPath);
                 $analysisSummary = OpenAI::chat()->create([
-                    'model' => 'gpt-4',
+                    'model' => 'gpt-4o',
                     'messages' => [
                         ['role' => 'system', 'content' => 'Summarize this financial analysis document for an internal government audience.'],
                         ['role' => 'user', 'content' => $pdfText],
@@ -84,5 +84,36 @@ class BillController extends Controller
         });
 
         return view('bill.result', ['result' => $result]);
+    }
+
+    public function search(Request $request, LegiScanService $legiscan)
+    {
+        $query = $request->input('query');
+        $sessionId = $request->input('session_id');
+
+        if (!$query || !$sessionId) {
+            return response()->json([]);
+        }
+
+        $results = $legiscan->searchBillsFromSession($query, $sessionId);
+
+        foreach ($results as &$bill) {
+            if (!isset($bill['number'])) {
+                \Log::warning('Missing bill number in result:', $bill);
+                $bill['has_analysis'] = false;
+                continue;
+            }
+
+            $billNumber = strtoupper(preg_replace('/\s+/', '', $bill['number']));
+            $pdfPath = storage_path("app/analyses/{$billNumber}.pdf");
+
+            $bill['has_analysis'] = file_exists($pdfPath);
+
+            if ($bill['has_analysis']) {
+                \Log::info("Found analysis for: {$billNumber}");
+            }
+        }
+
+        return response()->json($results);
     }
 }
