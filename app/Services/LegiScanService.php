@@ -72,11 +72,16 @@ class LegiScanService
 
     public function searchBillsFromSession($query, $sessionId)
     {
+        logger()->info('Searching bills via MasterList', [
+            'query' => $query,
+            'session_id' => $sessionId
+        ]);
+
         $response = Http::get("https://api.legiscan.com/", [
             'key' => $this->apiKey,
             'op' => 'getMasterList',
-            'session_id' => $sessionId,
-            'state' => $this->state,
+            'id' => $sessionId,
+            'state'  => $this->state,
         ]);
 
         if (!$response->ok()) {
@@ -96,15 +101,11 @@ class LegiScanService
             }
 
             $billNumber = strtoupper(preg_replace('/\s+/', '', $bill['number']));
-
             return str_starts_with($billNumber, $queryUpper);
-        })
-            ->map(fn($bill) => [
-                'bill_id' => $bill['bill_id'],
-                'number' => $bill['number'],
-                'title' => $bill['title'],
-            ])
-            ->take(10)
-            ->values();
+        })->map(fn($bill) => [
+            'bill_id' => $bill['bill_id'],
+            'number' => $bill['number'],
+            'title' => $bill['title'],
+        ])->take(10)->values()->all();
     }
 }

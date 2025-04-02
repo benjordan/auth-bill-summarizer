@@ -33,15 +33,11 @@
                         >
                             <span x-text="bill.number + ' - ' + bill.title"></span>
 
-                            <a
-    x-show="bill.has_analysis"
-    :href="`/storage/analyses/${bill.number.replace(/\s+/g, '')}.pdf`"
-    class="ml-2 text-green-500 hover:text-green-700"
-    title="Open analysis"
-    target="_blank"
->
-    📄
-</a>
+                            <template x-if="bill.has_analysis">
+                                <span title="You've already analyzed this one" class="ml-2 text-green-500">
+                                    ✅
+                                </span>
+                            </template>
                         </li>
                     </template>
                 </ul>

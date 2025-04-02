@@ -91,6 +91,11 @@ class BillController extends Controller
         $query = $request->input('query');
         $sessionId = $request->input('session_id');
 
+        logger()->info('Search controller called', [
+            'query' => $query,
+            'session_id' => $sessionId
+        ]);
+
         if (!$query || !$sessionId) {
             return response()->json([]);
         }
@@ -98,8 +103,8 @@ class BillController extends Controller
         $results = $legiscan->searchBillsFromSession($query, $sessionId);
 
         foreach ($results as &$bill) {
+
             if (!isset($bill['number'])) {
-                \Log::warning('Missing bill number in result:', $bill);
                 $bill['has_analysis'] = false;
                 continue;
             }
@@ -108,11 +113,8 @@ class BillController extends Controller
             $pdfPath = storage_path("app/analyses/{$billNumber}.pdf");
 
             $bill['has_analysis'] = file_exists($pdfPath);
-
-            if ($bill['has_analysis']) {
-                \Log::info("Found analysis for: {$billNumber}");
-            }
         }
+        logger()->info('Matched bill', $bill);
 
         return response()->json($results);
     }
